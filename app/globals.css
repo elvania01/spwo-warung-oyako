@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 2;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+
+body {
+  background-color: #fff;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Container utama */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 50px;
+  padding: 2rem;
+}
+
+/* Bagian kiri (gambar dan judul) */
+.login-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.login-left h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #6FC693;
+  margin-bottom: 1rem;
+}
+
+.login-left img {
+  width: 500px;
+  height: 500px;
+  object-fit: contain;
+}
+
+/* Bagian kanan (form login) */
+.login-box {
+  background-color: #6FC693;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 350px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  position: relative; /* penting untuk posisi elemen absolut di dalam */
+}
+
+.login-box h2 {
+  text-align: center;
+  color: #75DFBC;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+}
+
+.login-box p {
+  text-align: center;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.login-box input {
+  width: 100%;
+  padding: 10px 14px;
+  margin: 8px 0;
+  border: 1px solid #000;
+  border-radius: 25px;
+  font-size: 1rem;
+  outline: none;
+}
+
+.login-box button {
+  width: 100%;
+  background-color: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 25px;
+  padding: 10px;
+  margin-top: 15px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.login-box button:hover {
+  background-color: #1e40af;
+}
+
+/* Bagian link bawah */
+.login-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-links .forgot {
+  color: red;
+  text-decoration: none;
+  margin-top: 10px;
+}
+
+/* Teks New User? Sign Up di tengah bawah */
+.signup {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.new-user {
+  color: #000; 
+  margin-right: 5px;
+}
+
+.signup-link {
+  color: red;
+  text-decoration: none;
+}
+
+.signup-link:hover {
+  text-decoration: underline;
+}
