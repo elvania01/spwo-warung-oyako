@@ -18,10 +18,9 @@
     "paths": {
       "@/*": ["*"]
     },
+    "types": ["node"], 
     "plugins": [
-      {
-        "name": "next"
-      }
+      { "name": "next" }
     ]
   },
   "include": [
@@ -29,7 +28,9 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "app/api/user/[id]/route.js",
+    "lib/db.ts"
   ],
   "exclude": ["node_modules"]
 }

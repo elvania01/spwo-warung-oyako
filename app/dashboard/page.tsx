@@ -155,7 +155,7 @@ export default function DashboardPage() {
                   <Line
                     type="monotone"
                     dataKey="persentase"
-                    stroke="#facc15"
+                    stroke="#hsla"
                     strokeWidth={3}
                     dot={{ r: 4 }}
                   />

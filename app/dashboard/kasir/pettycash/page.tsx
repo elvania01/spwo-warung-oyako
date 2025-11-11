@@ -36,15 +36,27 @@ export default function PettyCashPage() {
   });
   const [isEditing, setIsEditing] = useState(false);
 
+  // 🔒 Cek login
   useEffect(() => {
-    const produkDariDB: Produk[] = [
-      { id: 1, nama: "Es Batu", kategori: "Bahan Baku", harga: 20000 },
-      { id: 2, nama: "Tisu", kategori: "Operasional", harga: 10000 },
-      { id: 3, nama: "Garam", kategori: "Bahan Baku", harga: 5000 },
-      { id: 4, nama: "Lada", kategori: "Bahan Baku", harga: 3000 },
-      { id: 5, nama: "Plastik Kemasan", kategori: "Operasional", harga: 2500 },
-    ];
-    setProdukList(produkDariDB);
+    const user = localStorage.getItem("user");
+    if (!user) router.replace("/autentikasi/login");
+  }, [router]);
+
+  // Ambil daftar produk dari DB (Neon) → sementara hardcoded dulu
+  useEffect(() => {
+    const fetchProduk = async () => {
+      // nanti bisa diganti fetch('/api/produk') dari Neon
+      const produkDariDB: Produk[] = [
+        { id: 1, nama: "Es Batu", kategori: "Bahan Baku", harga: 20000 },
+        { id: 2, nama: "Tisu", kategori: "Operasional", harga: 10000 },
+        { id: 3, nama: "Garam", kategori: "Bahan Baku", harga: 5000 },
+        { id: 4, nama: "Lada", kategori: "Bahan Baku", harga: 3000 },
+        { id: 5, nama: "Plastik Kemasan", kategori: "Operasional", harga: 2500 },
+      ];
+      setProdukList(produkDariDB);
+    };
+
+    fetchProduk();
   }, []);
 
   const handleLogout = () => {
@@ -60,7 +72,7 @@ export default function PettyCashPage() {
       if (produkTerpilih) {
         setForm((prev) => ({
           ...prev,
-          nama: value,
+          nama: produkTerpilih.nama,
           kategori: produkTerpilih.kategori,
           harga: produkTerpilih.harga,
         }));
@@ -80,13 +92,13 @@ export default function PettyCashPage() {
       return alert("Lengkapi semua kolom!");
     }
 
-    if (!form.gambarUrl) form.gambarUrl = "/images/default.jpg";
+    const newItem = { ...form, id: isEditing ? form.id : Date.now(), gambarUrl: form.gambarUrl || "/images/default.jpg" };
 
     if (isEditing) {
-      setData((prev) => prev.map((item) => (item.id === form.id ? form : item)));
+      setData((prev) => prev.map((item) => (item.id === form.id ? newItem : item)));
       setIsEditing(false);
     } else {
-      setData((prev) => [...prev, { ...form, id: Date.now() }]);
+      setData((prev) => [...prev, newItem]);
     }
 
     setForm({ id: 0, nama: "", kategori: "", jumlah: 1, harga: 0, tanggal: "", gambarUrl: "" });
@@ -104,7 +116,6 @@ export default function PettyCashPage() {
   };
 
   const handleDetail = (item: PettyCashItem) => {
-    if (!item.gambarUrl) item.gambarUrl = "/images/default.jpg";
     sessionStorage.setItem("pettyCashDetail", JSON.stringify(item));
     router.push("/dashboard/pettycash/detail");
   };
@@ -135,7 +146,6 @@ export default function PettyCashPage() {
 
               <input type="date" name="tanggal" value={form.tanggal} onChange={handleChange} className="border p-2 rounded w-full" />
 
-              {/* Upload Gambar */}
               <input type="file" name="gambarUrl" accept="image/*" onChange={handleChange} className="border p-2 rounded w-full" />
               {form.gambarUrl && <img src={form.gambarUrl} alt="Preview" className="mt-2 max-h-32 object-contain rounded-lg" />}
             </div>

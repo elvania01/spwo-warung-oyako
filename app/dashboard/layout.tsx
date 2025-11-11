@@ -1,4 +1,5 @@
 "use client";
+
 import SPWONavbar from "@/components/SPWOsidebar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -10,7 +11,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen bg-gray-100">
       <SPWONavbar onLogout={handleLogout} />
-      <main className="flex-1 ml-64 overflow-y-auto">{children}</main>
+      {/* Sembunyikan area konten jika kosong */}
+      {children && <main className="flex-1 ml-64 overflow-y-auto">{children}</main>}
     </div>
   );
 }

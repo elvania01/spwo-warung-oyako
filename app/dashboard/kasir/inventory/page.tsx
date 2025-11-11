@@ -23,11 +23,13 @@ export default function InventoryPage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  // Logout
   const handleLogout = () => {
     localStorage.removeItem("isLoggedIn");
-    window.location.href = "/";
+    router.push("/");
   };
 
+  // Klik di luar dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -41,6 +43,7 @@ export default function InventoryPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  // Data sementara, nanti diganti fetch API Neon
   const dataInventory: Item[] = [
     { id: "ITM001", nama: "Es Batu", kategori: "Minuman", tanggalUpdate: "03-11-2025", hargaModal: 3000, status: "Update", pettyCashId: "PC001" },
     { id: "ITM002", nama: "Gula Pasir", kategori: "Bahan Pokok", tanggalUpdate: "02-11-2025", hargaModal: 14000, status: "Update", pettyCashId: "PC002" },
@@ -56,6 +59,7 @@ export default function InventoryPage() {
     { id: "ITM012", nama: "Ayam Goreng", kategori: "Makanan", tanggalUpdate: "01-11-2025", hargaModal: 32000, status: "Belum Update", pettyCashId: null },
   ];
 
+  // Filtered data
   const filteredData = dataInventory.filter(
     item =>
       item.nama.toLowerCase().includes(searchTerm.toLowerCase()) &&
@@ -73,7 +77,8 @@ export default function InventoryPage() {
   return (
     <div className="flex h-screen w-full bg-gray-100 overflow-hidden">
       <SPWONavbar onLogout={handleLogout} />
-      <main className="flex-1 ml-100 bg-gray-50 p-6 overflow-y-auto custom-scrollbar">
+
+      <main className="flex-1 ml-60 p-6 overflow-y-auto custom-scrollbar">
         <div className="max-w-[95%] mx-auto space-y-4">
           {/* Header */}
           <div className="flex justify-between items-center border-b pb-2">
@@ -113,6 +118,7 @@ export default function InventoryPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
+
               {isOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                   {["Semua Kategori", "Makanan", "Minuman", "Bahan Pokok"].map((opt) => (
@@ -139,13 +145,9 @@ export default function InventoryPage() {
             <table className="min-w-full text-sm text-gray-700">
               <thead className="bg-gray-50 border-b text-gray-800">
                 <tr>
-                  <th className="px-4 py-2 text-left font-semibold">ID Item</th>
-                  <th className="px-4 py-2 text-left font-semibold">Nama</th>
-                  <th className="px-4 py-2 text-left font-semibold">Kategori</th>
-                  <th className="px-4 py-2 text-center font-semibold">Tanggal Update</th>
-                  <th className="px-4 py-2 text-center font-semibold">Harga Modal</th>
-                  <th className="px-4 py-2 text-center font-semibold">Status</th>
-                  <th className="px-4 py-2 text-center font-semibold">Aksi</th>
+                  {["ID Item", "Nama", "Kategori", "Tanggal Update", "Harga Modal", "Status", "Aksi"].map((head) => (
+                    <th key={head} className="px-4 py-2 text-left font-semibold">{head}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -161,7 +163,7 @@ export default function InventoryPage() {
                         {item.status}
                       </span>
                     </td>
-                    <td className="px-9 py-2 text-center">
+                    <td className="px-4 py-2 text-center">
                       <button
                         onClick={() => router.push(`/inventory/${item.id}`)}
                         className="flex items-center justify-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium text-sm mx-auto"
@@ -176,9 +178,8 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {/* Scrollbar Style */}
         <style jsx global>{`
-          .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+          .custom-scrollbar::-webkit-scrollbar { width: 0px; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
           html, body { overflow: hidden; }
