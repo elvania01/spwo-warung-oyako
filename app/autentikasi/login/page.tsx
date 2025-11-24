@@ -36,7 +36,7 @@ export default function LoginPage() {
       const userData = { username: 'kasir123', role: 'Kasir' };
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('user', JSON.stringify(userData));
-      router.push('/dashboard/kasir');
+      router.push('/dashboard');
       return;
     }
 

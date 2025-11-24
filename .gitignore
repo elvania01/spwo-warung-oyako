@@ -41,3 +41,5 @@ Thumbs.db
 # Dependency directories for other package managers
 .pnp/
 .pn
+
+/generated/prisma

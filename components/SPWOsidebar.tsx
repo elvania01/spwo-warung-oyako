@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 interface SPWONavbarProps {
   onLogout: () => void;
-  activePage?: string; // ✅ tambahkan ini, biar TS tidak error
+  activePage?: string; 
 }
 
 
@@ -27,7 +27,7 @@ export default function SPWONavbar({ onLogout }: SPWONavbarProps) {
     } else {
       router.push("/autentikasi/login");
     }
-    setTimeout(() => setLoading(false), 300); // biar smooth aja
+    setTimeout(() => setLoading(false), 30); // biar smooth aja
   }, [router]);
 
   const pathSegments = pathname.split("/").filter(Boolean);

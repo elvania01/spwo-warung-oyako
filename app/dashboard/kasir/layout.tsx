@@ -2,63 +2,32 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import SPWONavbar from "@/components/SPWOsidebar";
 
-export default function KasirLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function KasirLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (!storedUser) {
-      router.replace("/autentikasi/login");
+    const role = localStorage.getItem("role");
+    if (role !== "kasir") {
+      router.replace("/login");
       return;
     }
-
-    const user = JSON.parse(storedUser);
-    if (user.role === "Kasir") {
-      setIsAuthorized(true);
-    } else {
-      router.replace("/dashboard");
-    }
+    setVerified(true);
   }, [router]);
 
-  if (!isAuthorized) return null;
+  if (!verified) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <p className="text-gray-600">Memeriksa akses...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex w-screen h-screen bg-gray-100 overflow-hidden">
-      {/* ✅ Sidebar */}
-      <SPWONavbar onLogout={() => router.replace("/autentikasi/login")} />
-
-      {/* ✅ Konten utama */}
-      <main
-        className="flex-1 ml-64 p-8 bg-gray-50 overflow-y-auto custom-scrollbar"
-        style={{
-          scrollbarWidth: "thin",
-          scrollbarColor: "#d1d5db transparent",
-        }}
-      >
-        <div className="max-w-7xl mx-auto w-full">{children}</div>
-      </main>
-
-      {/* ✅ Style untuk menyelaraskan scrollbar */}
-      <style jsx global>{`
-        /* Untuk browser berbasis WebKit (Chrome, Edge, Safari) */
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: #cbd5e1;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-      `}</style>
+    <div className="min-h-screen bg-white">
+      {/* KASIR NAVBAR / SIDEBAR */}
+      {children}
     </div>
   );
 }

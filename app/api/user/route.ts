@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db"; // <- wajib ada
-import { ResultSetHeader } from "mysql2";
+import { sql } from "@/app/lib/db";
+import bcrypt from "bcryptjs";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const users = await query("SELECT * FROM users");
+    const users = await sql`SELECT id, username, role FROM users`;
     return NextResponse.json(users);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -13,14 +13,21 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const { username, password, role } = await req.json();
 
-    const result = (await query(
-      "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-      [body.username, body.password, body.role]
-    )) as ResultSetHeader;
+    if (!username || !password || !role) {
+      return NextResponse.json({ error: "Semua field wajib diisi" }, { status: 400 });
+    }
 
-    return NextResponse.json({ id: result.insertId });
+    const hashed = await bcrypt.hash(password, 10);
+
+    const rows = await sql`
+      INSERT INTO users (username, password, role)
+      VALUES (${username}, ${hashed}, ${role})
+      RETURNING id
+    `;
+
+    return NextResponse.json({ id: rows[0].id }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

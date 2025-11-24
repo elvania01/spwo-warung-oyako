@@ -1,19 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// Mock database, bisa diganti query ke MySQL
-const users = [
-  { username: "admin123", password: "12345", role: "Owner" },
-  { username: "kasir123", password: "12345", role: "Kasir" },
-];
+import { sql } from "@/app/lib/db";
+import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
-  const { username, password } = await req.json();
+  try {
+    const { username, password } = await req.json();
 
-  const user = users.find(u => u.username === username && u.password === password);
+    if (!username || !password) {
+      return NextResponse.json({ error: "Username dan password wajib diisi" }, { status: 400 });
+    }
 
-  if (!user) {
-    return NextResponse.json({ success: false, message: "Username atau password salah!" }, { status: 401 });
+    const users = await sql`SELECT * FROM users WHERE username = ${username}`;
+
+    if (users.length === 0) {
+      return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
+    }
+
+    const user = users[0];
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return NextResponse.json({ error: "Username atau password salah" }, { status: 401 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      user: { id: user.id, username: user.username, role: user.role },
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true, user: { username: user.username, role: user.role } });
 }
