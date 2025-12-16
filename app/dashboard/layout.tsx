@@ -9,10 +9,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
       <SPWONavbar onLogout={handleLogout} />
-      {/* Sembunyikan area konten jika kosong */}
-      {children && <main className="flex-1 ml-64 overflow-y-auto">{children}</main>}
+      
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col ml-64">
+        {/* Header */}
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-hidden p-6">
+          <div className="h-full overflow-y-auto pr-2">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -139,7 +139,7 @@ export default function DashboardKasirPage() {
                     }
                   />
                   <Bar dataKey="pengeluaran" fill="#10b981" barSize={40} radius={[6, 6, 0, 0]} />
-                  <Line type="monotone" dataKey="persentase" stroke="#facc15" strokeWidth={3} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="persentase" stroke="#15fa61ff" strokeWidth={3} dot={{ r: 4 }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

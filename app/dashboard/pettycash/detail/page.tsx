@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image"; // Import Next.js Image component
 
 interface DetailPettyCashProps {
   id: number;
@@ -28,6 +29,9 @@ export default function DetailPettyCashPage() {
   }, [router]);
 
   if (!data) return <div className="p-8 text-center text-white">Loading...</div>;
+
+  // Cek apakah gambarUrl valid atau ada
+  const hasValidImage = data.gambarUrl && data.gambarUrl.trim() !== "";
 
   return (
     <motion.div
@@ -75,14 +79,26 @@ export default function DetailPettyCashPage() {
 
         {/* Kolom kanan (gambar) */}
         <div className="flex-1 flex justify-center items-center">
-          <motion.img
-            src={data.gambarUrl}
-            alt={data.nama}
-            className="max-w-full rounded-2xl shadow-lg object-contain"
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          />
+          {hasValidImage ? (
+            // Menggunakan Next.js Image component untuk optimasi
+            <div className="relative w-full h-[300px] lg:h-[400px]">
+              <Image
+                src={data.gambarUrl}
+                alt={data.nama}
+                fill
+                className="rounded-2xl shadow-lg object-contain"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
+            </div>
+          ) : (
+            // Fallback jika tidak ada gambar
+            <div className="w-full h-[300px] lg:h-[400px] flex flex-col items-center justify-center bg-gray-100 rounded-2xl shadow-lg">
+              <div className="text-6xl text-gray-400 mb-4">📷</div>
+              <p className="text-gray-500 text-center px-4">
+                Tidak ada gambar tersedia untuk produk ini
+              </p>
+            </div>
+          )}
         </div>
       </motion.div>
 

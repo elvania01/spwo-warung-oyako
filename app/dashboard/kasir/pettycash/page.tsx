@@ -59,6 +59,40 @@ export default function PettyCashPage() {
     fetchProduk();
   }, []);
 
+  // Simulasi data awal sesuai gambar
+  useEffect(() => {
+    const initialData: PettyCashItem[] = [
+      {
+        id: 1,
+        nama: "Plastik Kemasan",
+        kategori: "Overseasmail",
+        jumlah: 5,
+        harga: 2500,
+        tanggal: "2025-12-15",
+        gambarUrl: "",
+      },
+      {
+        id: 2,
+        nama: "Lada",
+        kategori: "Bahun Potok",
+        jumlah: 5,
+        harga: 2000,
+        tanggal: "2025-12-15",
+        gambarUrl: "",
+      },
+      {
+        id: 3,
+        nama: "Garam",
+        kategori: "Bahun Baku",
+        jumlah: 20,
+        harga: 5000,
+        tanggal: "2025-12-13",
+        gambarUrl: "",
+      },
+    ];
+    setData(initialData);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     router.push("/autentikasi/login");
@@ -76,6 +110,8 @@ export default function PettyCashPage() {
           kategori: produkTerpilih.kategori,
           harga: produkTerpilih.harga,
         }));
+      } else {
+        setForm((prev) => ({ ...prev, [name]: value }));
       }
     } else if (name === "jumlah") {
       setForm((prev) => ({ ...prev, jumlah: Math.max(Number(value), 1) }));
@@ -92,7 +128,11 @@ export default function PettyCashPage() {
       return alert("Lengkapi semua kolom!");
     }
 
-    const newItem = { ...form, id: isEditing ? form.id : Date.now(), gambarUrl: form.gambarUrl || "/images/default.jpg" };
+    const newItem = { 
+      ...form, 
+      id: isEditing ? form.id : Date.now(), 
+      gambarUrl: form.gambarUrl || "/images/default.jpg" 
+    };
 
     if (isEditing) {
       setData((prev) => prev.map((item) => (item.id === form.id ? newItem : item)));
@@ -120,77 +160,197 @@ export default function PettyCashPage() {
     router.push("/dashboard/pettycash/detail");
   };
 
+  // Hitung total keseluruhan
+  const totalKeseluruhan = data.reduce((sum, item) => sum + (item.jumlah * item.harga), 0);
+
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <SPWONavbar onLogout={handleLogout} />
-      <main className="flex-1 ml-60 p-8 overflow-y-auto">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">Petty Cash</h2>
+      <main className="flex-1 ml-64 p-6 overflow-y-auto">
+        <div className="max-w-full">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">Daftar Transaksi Petty Cash</h1>
+          </div>
 
           {/* Form Input */}
-          <div className="bg-white shadow rounded-xl p-6 mb-8">
-            <h3 className="text-lg font-semibold mb-4">{isEditing ? "Edit Data" : "Tambah Data"}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <select name="nama" value={form.nama} onChange={handleChange} className="border p-2 rounded w-full">
-                <option value="">Pilih Produk</option>
-                {produkList.map((p) => (
-                  <option key={p.id} value={p.nama}>{p.nama}</option>
-                ))}
-              </select>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              {isEditing ? "Edit Data Transaksi" : "Tambah Transaksi Baru"}
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Produk</label>
+                <select 
+                  name="nama" 
+                  value={form.nama} 
+                  onChange={handleChange} 
+                  className="input-field"
+                >
+                  <option value="">Pilih Produk</option>
+                  {produkList.map((p) => (
+                    <option key={p.id} value={p.nama}>{p.nama}</option>
+                  ))}
+                </select>
+              </div>
 
-              <input type="text" name="kategori" value={form.kategori} readOnly placeholder="Kategori Otomatis" className="border p-2 rounded w-full bg-gray-100 cursor-not-allowed" />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+                <input 
+                  type="text" 
+                  name="kategori" 
+                  value={form.kategori} 
+                  readOnly 
+                  className="input-field bg-gray-50 cursor-not-allowed" 
+                  placeholder="Otomatis terisi"
+                />
+              </div>
 
-              <input type="number" name="jumlah" value={form.jumlah} onChange={handleChange} placeholder="Jumlah" className="border p-2 rounded w-full" />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
+                <input 
+                  type="number" 
+                  name="jumlah" 
+                  value={form.jumlah} 
+                  onChange={handleChange} 
+                  min="1"
+                  className="input-field"
+                />
+              </div>
 
-              <input type="number" name="harga" value={form.harga} readOnly placeholder="Harga Otomatis" className="border p-2 rounded w-full bg-gray-100 cursor-not-allowed" />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Harga (Rp)</label>
+                <input 
+                  type="text" 
+                  name="harga" 
+                  value={form.harga.toLocaleString("id-ID")} 
+                  readOnly 
+                  className="input-field bg-gray-50 cursor-not-allowed"
+                />
+              </div>
 
-              <input type="date" name="tanggal" value={form.tanggal} onChange={handleChange} className="border p-2 rounded w-full" />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+                <input 
+                  type="date" 
+                  name="tanggal" 
+                  value={form.tanggal} 
+                  onChange={handleChange} 
+                  className="input-field"
+                />
+              </div>
 
-              <input type="file" name="gambarUrl" accept="image/*" onChange={handleChange} className="border p-2 rounded w-full" />
-              {form.gambarUrl && <img src={form.gambarUrl} alt="Preview" className="mt-2 max-h-32 object-contain rounded-lg" />}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Gambar</label>
+                <input 
+                  type="file" 
+                  name="gambarUrl" 
+                  accept="image/*" 
+                  onChange={handleChange} 
+                  className="input-field py-1.5"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                {form.gambarUrl && (
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600 mb-1">Preview:</p>
+                    <img 
+                      src={form.gambarUrl} 
+                      alt="Preview" 
+                      className="max-h-32 object-contain rounded-lg border border-gray-300"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
-            <button onClick={handleSubmit} className="mt-4 bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 transition">
-              {isEditing ? "Simpan Perubahan" : "Tambah"}
+            <button 
+              onClick={handleSubmit} 
+              className="btn-primary"
+            >
+              {isEditing ? "Simpan Perubahan" : "Tambah Transaksi"}
             </button>
           </div>
 
           {/* Tabel Data */}
-          <div className="bg-white shadow rounded-xl p-6 overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b bg-gray-50 text-left">
-                  <th className="p-3 font-semibold">Nama Produk</th>
-                  <th className="p-3 font-semibold">Kategori</th>
-                  <th className="p-3 font-semibold">Jumlah</th>
-                  <th className="p-3 font-semibold">Harga</th>
-                  <th className="p-3 font-semibold">Tanggal</th>
-                  <th className="p-3 font-semibold">Total</th>
-                  <th className="p-3 font-semibold text-center">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length ? data.map((item) => (
-                  <tr key={item.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">{item.nama}</td>
-                    <td className="p-3">{item.kategori}</td>
-                    <td className="p-3">{item.jumlah}</td>
-                    <td className="p-3">Rp {item.harga.toLocaleString("id-ID")}</td>
-                    <td className="p-3">{new Date(item.tanggal).toLocaleDateString("id-ID")}</td>
-                    <td className="p-3">Rp {(item.jumlah * item.harga).toLocaleString("id-ID")}</td>
-                    <td className="p-3 flex gap-2 justify-center">
-                      <button onClick={() => handleDetail(item)} className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">Detail</button>
-                      <button onClick={() => handleEdit(item)} className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">✎</button>
-                      <button onClick={() => handleDelete(item.id)} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">🗑</button>
-                    </td>
-                  </tr>
-                )) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="pettycash-table-container">
+              <table className="pettycash-table">
+                <thead>
                   <tr>
-                    <td colSpan={7} className="text-center py-4 text-gray-500">Belum ada data petty cash.</td>
+                    <th>ID</th>
+                    <th>NAME PRODUK</th>
+                    <th>KATEGORI</th>
+                    <th>JUNLAH</th>
+                    <th>HARGA</th>
+                    <th>TANGGAL</th>
+                    <th>TOTAL</th>
+                    <th>AKSI</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.length ? data.map((item, index) => {
+                    const total = item.jumlah * item.harga;
+                    const formattedDate = new Date(item.tanggal).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric"
+                    });
+                    
+                    return (
+                      <tr key={item.id}>
+                        <td>PC{String(item.id).padStart(3, '0')}</td>
+                        <td>{item.nama}</td>
+                        <td>{item.kategori}</td>
+                        <td className="text-center">{item.jumlah}</td>
+                        <td className="text-right">Rp {item.harga.toLocaleString("id-ID")}</td>
+                        <td>{formattedDate}</td>
+                        <td className="text-right font-semibold">
+                          Rp {total.toLocaleString("id-ID")}
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              onClick={() => handleDetail(item)} 
+                              className="action-btn action-detail"
+                            >
+                              ▲ Detail
+                            </button>
+                            <button 
+                              onClick={() => handleEdit(item)} 
+                              className="action-btn action-edit"
+                            >
+                              ▼ Edit
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr>
+                      <td colSpan={8} className="text-center py-8 text-gray-500">
+                        Belum ada data transaksi petty cash.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer Tabel */}
+            <div className="table-footer">
+              <div className="entries-info">
+                Menampilkan {data.length} transaksi
+              </div>
+              <div className="total-summary">
+                <span className="total-label">Total Keseluruhan</span>
+                <span className="total-amount">
+                  Rp {totalKeseluruhan.toLocaleString("id-ID")}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </main>

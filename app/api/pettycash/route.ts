@@ -1,94 +1,142 @@
-// app/api/pettycash/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/app/lib/db";
 
-// ---------------- GET pettycash ----------------
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { page, limit } = Object.fromEntries(req.nextUrl.searchParams.entries()) as {
-      page?: string;
-      limit?: string;
-    };
-
-    const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 10;
-    const offset = (pageNum - 1) * limitNum;
-
-    const rows = await sql`
-      SELECT id, nama, kategori, jumlah, harga, total, tanggal, "gambarUrl"
+    // Ambil semua data pettycash
+    const data = await sql`
+      SELECT 
+        id,
+        nama,
+        kategori,
+        jumlah,
+        harga,
+        tanggal,
+        total,
+        gambar_url,
+        created_at
       FROM pettycash
-      ORDER BY tanggal DESC
-      LIMIT ${limitNum} OFFSET ${offset}
+      ORDER BY tanggal DESC, id DESC
     `;
 
-    const countResult = await sql`SELECT COUNT(*) AS total FROM pettycash`;
-    const totalItems = Number(countResult[0]?.total || 0);
-    const totalPages = Math.max(1, Math.ceil(totalItems / limitNum));
-
-    return NextResponse.json({
-      success: true,
-      data: rows,
-      pagination: { page: pageNum, limit: limitNum, totalItems, totalPages },
+    return NextResponse.json({ 
+      success: true, 
+      data: data,
+      message: "Data berhasil diambil"
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error("GET pettycash error:", err);
+    return NextResponse.json({ 
+      success: false, 
+      error: err.message || "Gagal mengambil data petty cash"
+    }, { status: 500 });
   }
 }
 
-// ---------------- POST pettycash ----------------
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { nama, kategori, jumlah, harga, tanggal, "gambarUrl": gambarUrl } = await req.json();
+    const body = await request.json();
+    const { 
+      nama,
+      kategori = "Umum",
+      jumlah = 1,
+      harga = 0,
+      tanggal,
+      gambarUrl
+    } = body;
 
-    if (!nama || !kategori || jumlah === undefined || harga === undefined || !tanggal) {
-      return NextResponse.json({ success: false, error: "Field wajib diisi" }, { status: 400 });
+    // Validasi input
+    if (!nama) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "Nama produk harus diisi" 
+      }, { status: 400 });
     }
 
-    const total = jumlah * harga;
+    if (jumlah <= 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "Jumlah harus lebih dari 0" 
+      }, { status: 400 });
+    }
 
-    const rows = await sql`
-      INSERT INTO pettycash (nama, kategori, jumlah, harga, total, tanggal, "gambarUrl")
-      VALUES (${nama}, ${kategori}, ${jumlah}, ${harga}, ${total}, ${tanggal}, ${gambarUrl})
-      RETURNING id
+    if (harga < 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "Harga tidak boleh negatif" 
+      }, { status: 400 });
+    }
+
+    // Insert data ke database
+    const [newItem] = await sql`
+      INSERT INTO pettycash (
+        nama,
+        kategori,
+        jumlah,
+        harga,
+        tanggal,
+        gambar_url
+      ) VALUES (
+        ${nama},
+        ${kategori},
+        ${jumlah},
+        ${harga},
+        ${tanggal || sql`CURRENT_DATE`},
+        ${gambarUrl || null}
+      )
+      RETURNING *
     `;
 
-    return NextResponse.json({ success: true, id: rows[0].id }, { status: 201 });
+    return NextResponse.json({ 
+      success: true, 
+      message: "Transaksi berhasil ditambahkan",
+      data: newItem
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error("POST pettycash error:", err);
+    return NextResponse.json({ 
+      success: false, 
+      error: err.message || "Terjadi kesalahan saat menambahkan transaksi"
+    }, { status: 500 });
   }
 }
 
-// ---------------- PUT pettycash ----------------
-export async function PUT(req: NextRequest) {
+export async function DELETE(request: NextRequest) {
   try {
-    const id = req.nextUrl.searchParams.get("id");
-    if (!id) return NextResponse.json({ success: false, error: "ID tidak ditemukan" }, { status: 400 });
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "ID transaksi harus disertakan" 
+      }, { status: 400 });
+    }
 
-    const { nama, kategori, jumlah, harga, tanggal, "gambarUrl": gambarUrl } = await req.json();
-    const total = jumlah * harga;
-
-    await sql`
-      UPDATE pettycash
-      SET nama=${nama}, kategori=${kategori}, jumlah=${jumlah}, harga=${harga}, total=${total}, tanggal=${tanggal}, "gambarUrl"=${gambarUrl}
-      WHERE id=${id}
+    // Hapus data
+    const [deletedItem] = await sql`
+      DELETE FROM pettycash 
+      WHERE id = ${parseInt(id)}
+      RETURNING *
     `;
 
-    return NextResponse.json({ success: true, message: "Updated" });
+    if (!deletedItem) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "Transaksi tidak ditemukan" 
+      }, { status: 404 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: "Transaksi berhasil dihapus",
+      data: deletedItem
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
-  }
-}
-
-// ---------------- DELETE pettycash ----------------
-export async function DELETE(req: NextRequest) {
-  try {
-    const id = req.nextUrl.searchParams.get("id");
-    if (!id) return NextResponse.json({ success: false, error: "ID tidak ditemukan" }, { status: 400 });
-
-    await sql`DELETE FROM pettycash WHERE id=${id}`;
-
-    return NextResponse.json({ success: true, message: "Deleted" });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error("DELETE pettycash error:", err);
+    return NextResponse.json({ 
+      success: false, 
+      error: err.message 
+    }, { status: 500 });
   }
 }

@@ -47,17 +47,17 @@ export default function LoginPage() {
   return (
     <div className="login-container flex h-screen">
       {/* Kiri */}
-      <div className="login-left flex-1 flex flex-col justify-center items-center bg-amber-100 p-8">
-        <h1 className="text-4xl font-bold text-amber-900 mb-4">Warung Oyako</h1>
-        <Image
-          src={oyakoCat}
-          alt="Warung Oyako"
-          width={400}
-          height={400}
-          priority
-          className="rounded-xl"
-        />
-      </div>
+        <div className="login-left flex-1 flex flex-col justify-center items-center bg-white p-8">
+      <h1 className="text-4xl font-bold text-amber-900 mb-4">Warung Oyako</h1>
+      <Image
+        src={oyakoCat}
+        alt="Warung Oyako"
+        width={400}
+        height={400}
+        priority
+        className="rounded-xl"
+      />
+    </div>
 
       {/* Kanan */}
       <div className="login-box flex-1 flex flex-col justify-center items-center bg-white shadow-lg p-10">

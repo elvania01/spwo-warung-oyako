@@ -44,9 +44,9 @@ export default function SPWONavbar({ onLogout }: SPWONavbarProps) {
   ];
 
   const kasirMenu = [
-    { label: "Dashboard", href: "/dashboard/kasir" },
-    { label: "Petty Cash", href: "/dashboard/kasir/pettycash" },
-    { label: "Inventory", href: "/dashboard/kasir/inventory" },
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Petty Cash", href: "/dashboard/pettycash" },
+    { label: "Inventory", href: "/dashboard/inventory" },
   ];
 
   const menu = role === "Owner" ? ownerMenu : kasirMenu;

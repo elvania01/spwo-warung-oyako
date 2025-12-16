@@ -1,31 +1,73 @@
-import { NextRequest, NextResponse } from "next/server";
-import sql from "@/app/lib/db";
+import { NextResponse } from "next/server";
+import { sql } from "@/app/lib/db";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const { page, limit } = Object.fromEntries(req.nextUrl.searchParams.entries()) as {
-      page?: string;
-      limit?: string;
-    };
+    console.log("🔗 Fetching inventory from database...");
+    
+    // ✅ QUERY SANGAT SIMPLE - tanpa created_at
+    const data = await sql`
+      SELECT 
+        id_item,
+        nama_produk,
+        kategori,
+        tanggal_pembelian,
+        harga_modal,
+        status
+      FROM inventory 
+      ORDER BY tanggal_pembelian DESC
+    `;
+    
+    console.log(`✅ Successfully fetched ${data.length} items`);
+    return NextResponse.json(data);
+    
+  } catch (error: any) {
+    console.error("❌ GET API Error:", error.message);
+    // ✅ RETURN EMPTY ARRAY JIKA ERROR
+    return NextResponse.json([]);
+  }
+}
 
-    const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 10;
-    const offset = (pageNum - 1) * limitNum;
-
-    const inventory = await sql`SELECT * FROM inventory ORDER BY nama ASC LIMIT ${limitNum} OFFSET ${offset}`;
-    const countResult = await sql`SELECT COUNT(*) AS total FROM inventory`;
-    const totalItems = Number(countResult[0]?.total || 0);
-    const totalPages = Math.max(1, Math.ceil(totalItems / limitNum));
-
-    return NextResponse.json({
-      success: true,
-      data: inventory,
-      pagination: { page: pageNum, limit: limitNum, totalItems, totalPages },
-    });
-  } catch (error) {
-    console.error("Inventory API error:", error);
+export async function POST(request: Request) {
+  try {
+    const { id_item, nama_produk, kategori, tanggal_pembelian, harga_modal, status } = await request.json();
+    
+    // Check if exists
+    const existing = await sql`
+      SELECT id_item FROM inventory WHERE id_item = ${id_item}
+    `;
+    
+    let result;
+    if (existing.length > 0) {
+      // UPDATE
+      result = await sql`
+        UPDATE inventory 
+        SET nama_produk = ${nama_produk}, 
+            kategori = ${kategori}, 
+            tanggal_pembelian = ${tanggal_pembelian},
+            harga_modal = ${harga_modal},
+            status = ${status}
+        WHERE id_item = ${id_item}
+        RETURNING *
+      `;
+      console.log(`🔄 Updated: ${id_item}`);
+    } else {
+      // INSERT
+      result = await sql`
+        INSERT INTO inventory 
+        (id_item, nama_produk, kategori, tanggal_pembelian, harga_modal, status)
+        VALUES (${id_item}, ${nama_produk}, ${kategori}, ${tanggal_pembelian}, ${harga_modal}, ${status})
+        RETURNING *
+      `;
+      console.log(`🆕 Created: ${id_item}`);
+    }
+    
+    return NextResponse.json({ success: true, data: result[0] });
+    
+  } catch (error: any) {
+    console.error("❌ POST Error:", error);
     return NextResponse.json(
-      { success: false, message: (error as Error).message || "Server error" },
+      { success: false, error: error.message },
       { status: 500 }
     );
   }

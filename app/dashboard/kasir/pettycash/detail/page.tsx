@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 interface DetailPettyCashProps {
@@ -17,40 +17,17 @@ interface DetailPettyCashProps {
 export default function DetailPettyCashPage() {
   const router = useRouter();
   const [data, setData] = useState<DetailPettyCashProps | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 🔹 Ambil data dari sessionStorage sementara
     const storedData = sessionStorage.getItem("pettyCashDetail");
     if (!storedData) {
       router.back();
-      return;
+    } else {
+      setData(JSON.parse(storedData));
     }
-
-    const parsedData: DetailPettyCashProps = JSON.parse(storedData);
-    parsedData.gambarUrl ||= "/images/default.jpg";
-    setData(parsedData);
-    setLoading(false);
-
-    // 🔹 Nanti bisa diganti fetch(`/api/pettycash/${parsedData.id}`)
   }, [router]);
 
-  if (loading || !data) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-teal-500">
-        <p className="text-white text-lg">Loading...</p>
-      </div>
-    );
-  }
-
-  const fields = [
-    { label: "ID Produk", value: data.id },
-    { label: "Nama Produk", value: data.nama },
-    { label: "Jumlah", value: data.jumlah },
-    { label: "Harga", value: `Rp ${data.harga.toLocaleString("id-ID")}` },
-    { label: "Kategori", value: data.kategori },
-    { label: "Tanggal Pembelian", value: new Date(data.tanggal).toLocaleDateString("id-ID") },
-  ];
+  if (!data) return <div className="p-8 text-center text-white">Loading...</div>;
 
   return (
     <motion.div
@@ -69,8 +46,19 @@ export default function DetailPettyCashPage() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
+        {/* Kolom kiri (detail) */}
         <div className="flex-1 space-y-6">
-          {fields.map((field, idx) => (
+          {([
+            { label: "ID Produk", value: data.id },
+            { label: "Nama Produk", value: data.nama },
+            { label: "Jumlah", value: data.jumlah },
+            { label: "Harga", value: `Rp${data.harga.toLocaleString("id-ID")}` },
+            { label: "Kategori", value: data.kategori },
+            {
+              label: "Tanggal Pembelian",
+              value: new Date(data.tanggal).toLocaleDateString("id-ID"),
+            },
+          ] as const).map((field, idx) => (
             <div key={idx}>
               <label className="text-red-600 font-semibold mb-1 block">
                 {field.label}
@@ -85,6 +73,7 @@ export default function DetailPettyCashPage() {
           ))}
         </div>
 
+        {/* Kolom kanan (gambar) */}
         <div className="flex-1 flex justify-center items-center">
           <motion.img
             src={data.gambarUrl}
@@ -97,6 +86,7 @@ export default function DetailPettyCashPage() {
         </div>
       </motion.div>
 
+      {/* Tombol BACK */}
       <button
         onClick={() => router.back()}
         className="mt-8 lg:mt-6 bg-red-600 text-white px-8 py-3 rounded-xl shadow hover:bg-red-700 transition"

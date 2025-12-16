@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@neondatabase/serverless": "^1.0.2",
     "bcryptjs": "^3.0.3",
+    "chart.js": "^4.5.1",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "framer-motion": "^12.23.24",
@@ -27,6 +29,7 @@
     "pg": "^8.16.3",
     "postgres": "^3.4.7",
     "react": "^19.2.0",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
     "recharts": "^3.3.0",
@@ -35,6 +38,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.16",
     "@types/bcryptjs": "^2.4.6",
+    "@types/chart.js": "^4.0.1",
     "@types/estree": "^1.0.8",
     "@types/json-schema": "^7.0.15",
     "@types/node": "^24.10.0",
@@ -43,6 +47,7 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "autoprefixer": "^10.4.21",
+    "baseline-browser-mapping": "^2.9.7",
     "eslint": "^9.13.0",
     "eslint-config-next": "^15.0.0",
     "postcss": "^8.5.6",
