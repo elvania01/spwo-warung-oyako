@@ -14,6 +14,7 @@ interface PettyCashItem {
   tanggal: string;
   gambarUrl: string;
   total: number;
+  created_at?: string;
 }
 
 interface Produk {
@@ -42,6 +43,7 @@ export default function PettyCashPage() {
   const [inputMode, setInputMode] = useState<"dropdown" | "manual">("dropdown");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const itemsPerPage = 10;
 
   // Generate unique ID
@@ -70,7 +72,8 @@ export default function PettyCashPage() {
               harga: parseFloat(item.harga) || 0,
               tanggal: item.tanggal || new Date().toISOString().split('T')[0],
               gambarUrl: item.gambar_url || item.gambarUrl || "",
-              total: parseFloat(item.total) || (Number(item.jumlah) || 0) * (parseFloat(item.harga) || 0)
+              total: parseFloat(item.total) || (Number(item.jumlah) || 0) * (parseFloat(item.harga) || 0),
+              created_at: item.created_at
             }));
           
           setData(convertedData);
@@ -119,8 +122,177 @@ export default function PettyCashPage() {
     }
   };
 
+  // Upload gambar ke server
+  const uploadImageToServer = async (file: File): Promise<string> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100;
+            setUploadProgress(Math.round(percentComplete));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const result = JSON.parse(xhr.responseText);
+            if (result.success) {
+              resolve(result.data.url);
+            } else {
+              reject(new Error(result.error || "Upload gagal"));
+            }
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+          setUploadProgress(0);
+        };
+
+        xhr.onerror = () => {
+          reject(new Error("Network error"));
+          setUploadProgress(0);
+        };
+
+        xhr.open('POST', '/api/upload');
+        xhr.send(formData);
+      } catch (error) {
+        reject(error);
+        setUploadProgress(0);
+      }
+    });
+  };
+
+  // Convert image to Base64 dengan kompresi
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Validasi ukuran file (maksimal 2MB untuk Base64)
+      const maxSize = 2 * 1024 * 1024;
+      if (file.size > maxSize) {
+        // Kompresi jika file terlalu besar
+        compressImageForBase64(file).then(resolve).catch(reject);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Kompresi gambar untuk Base64
+  const compressImageForBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Atur ukuran maksimal
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          
+          let width = img.width;
+          let height = img.height;
+          
+          // Resize jika perlu
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw image ke canvas
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Konversi ke Base64 dengan kualitas optimal
+          const quality = file.size > 1024 * 1024 ? 0.7 : 0.8; // Lebih kecil kualitas untuk file besar
+          const base64 = canvas.toDataURL('image/jpeg', quality);
+          
+          resolve(base64);
+        };
+        
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  // Handle image upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validasi tipe file
+    const validTypes = [
+      'image/jpeg', 
+      'image/jpg', 
+      'image/png', 
+      'image/gif', 
+      'image/webp',
+      'image/bmp'
+    ];
+    
+    if (!validTypes.includes(file.type)) {
+      alert('Hanya file gambar (JPEG, PNG, GIF, WebP, BMP) yang diizinkan');
+      e.target.value = '';
+      return;
+    }
+
+    // Tampilkan loading
+    setLoading(true);
+
+    try {
+      // Pilih metode upload (Base64 atau Server)
+      // Untuk demo, kita gunakan Base64. Untuk production, gunakan upload ke server
+      const useBase64 = true; // Ganti false untuk upload ke server
+      
+      let imageUrl = "";
+      
+      if (useBase64) {
+        // Convert ke Base64
+        imageUrl = await convertToBase64(file);
+      } else {
+        // Upload ke server
+        imageUrl = await uploadImageToServer(file);
+      }
+      
+      setForm(prev => ({ 
+        ...prev, 
+        gambarUrl: imageUrl 
+      }));
+      
+      alert('Gambar berhasil diupload!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`Gagal upload gambar: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+      e.target.value = '';
+    }
+  };
+
   // Save data ke API
-  const saveToAPI = async (formData: PettyCashItem) => {
+  const saveToAPI = async (formData: PettyCashItem): Promise<boolean> => {
     try {
       const dbData = {
         nama: formData.nama,
@@ -128,8 +300,10 @@ export default function PettyCashPage() {
         jumlah: Number(formData.jumlah),
         harga: formData.harga,
         tanggal: formData.tanggal,
-        gambar_url: formData.gambarUrl
+        gambarUrl: formData.gambarUrl || null // Simpan Base64 atau URL
       };
+
+      console.log("Saving to API:", dbData);
 
       const response = await fetch('/api/pettycash', {
         method: 'POST',
@@ -141,16 +315,17 @@ export default function PettyCashPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
       }
 
       const result = await response.json();
       
       if (result.success) {
-        fetchDataFromAPI();
+        await fetchDataFromAPI();
         return true;
       } else {
-        throw new Error(result.message || "Gagal menyimpan data");
+        throw new Error(result.error || "Gagal menyimpan data");
       }
     } catch (error) {
       console.error('Gagal menyimpan:', error);
@@ -160,7 +335,7 @@ export default function PettyCashPage() {
   };
 
   // Delete data dari API
-  const deleteFromAPI = async (id: string) => {
+  const deleteFromAPI = async (id: string): Promise<boolean> => {
     try {
       const response = await fetch(`/api/pettycash?id=${id}`, {
         method: 'DELETE',
@@ -173,10 +348,24 @@ export default function PettyCashPage() {
       const result = await response.json();
       
       if (result.success) {
-        fetchDataFromAPI();
+        // Jika ada gambar di server, hapus juga
+        const item = data.find(d => d.id === id);
+        if (item?.gambarUrl && item.gambarUrl.startsWith('/uploads/')) {
+          try {
+            await fetch('/api/upload', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: item.gambarUrl })
+            });
+          } catch (error) {
+            console.error('Gagal menghapus file gambar:', error);
+          }
+        }
+        
+        await fetchDataFromAPI();
         return true;
       } else {
-        throw new Error(result.message || "Gagal menghapus data");
+        throw new Error(result.error || "Gagal menghapus data");
       }
     } catch (error) {
       console.error('Gagal menghapus:', error);
@@ -229,7 +418,7 @@ export default function PettyCashPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, files } = e.target as HTMLInputElement;
+    const { name, value } = e.target;
 
     if (name === "nama" && inputMode === "dropdown") {
       const produkTerpilih = produkList.find((p) => p.nama === value);
@@ -260,13 +449,6 @@ export default function PettyCashPage() {
       }));
     } else if (name === "kategori") {
       setForm((prev) => ({ ...prev, kategori: value }));
-    } else if (name === "gambarUrl" && files?.[0]) {
-      const file = files[0];
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setForm(prev => ({ ...prev, gambarUrl: e.target?.result as string }));
-      };
-      reader.readAsDataURL(file);
     } else if (name === "tanggal") {
       setForm((prev) => ({ ...prev, tanggal: value }));
     } else {
@@ -353,8 +535,11 @@ export default function PettyCashPage() {
   };
 
   const handleDetail = (item: PettyCashItem) => {
+    // Simpan ke sessionStorage untuk halaman detail
     sessionStorage.setItem("pettyCashDetail", JSON.stringify(item));
-    router.push("/dashboard/pettycash/detail");
+    
+    // Navigasi ke halaman detail dengan ID sebagai parameter
+    router.push(`/dashboard/pettycash/detail?id=${item.id}`);
   };
 
   // Safe filtering function
@@ -497,6 +682,22 @@ export default function PettyCashPage() {
             )}
           </div>
 
+          {/* Progress Bar untuk Upload */}
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-gray-600 mb-1">
+                <span>Mengupload gambar...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
           {/* Form Grid - Lebih rapat */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Nama Produk */}
@@ -630,49 +831,90 @@ export default function PettyCashPage() {
             </div>
           </div>
 
-          {/* Upload Gambar - Lebih kecil */}
+          {/* Upload Gambar - Lebih lengkap */}
           <div className="mt-4">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Bukti Pembelian (Opsional)
             </label>
-            <div className="border border-dashed border-gray-300 rounded p-2 text-center hover:border-emerald-400 transition-colors">
+            <div className="border border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-emerald-400 transition-colors bg-gray-50">
               <input 
                 type="file" 
                 id="file-upload"
                 name="gambarUrl" 
                 accept="image/*" 
-                onChange={handleChange} 
+                onChange={handleImageUpload} 
                 className="hidden"
+                disabled={loading}
               />
-              <label htmlFor="file-upload" className="cursor-pointer block">
+              <label htmlFor="file-upload" className={`cursor-pointer block ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mb-1">
-                    <span className="text-sm">📎</span>
+                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
+                    <span className="text-emerald-600 text-xl">📎</span>
                   </div>
-                  <p className="text-xs text-gray-600">
-                    {form.gambarUrl ? "File terpilih" : "Klik untuk upload"}
+                  <p className="text-sm font-medium text-gray-700 mb-1">
+                    {form.gambarUrl ? "✅ File terpilih" : "Klik untuk upload gambar"}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Seret & lepas atau klik untuk memilih file
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Maksimal 2MB • Format: JPG, PNG, GIF, WebP
                   </p>
                 </div>
               </label>
             </div>
+            
             {form.gambarUrl && (
-              <div className="mt-2 flex items-center gap-2">
-                <img 
-                  src={form.gambarUrl} 
-                  alt="Preview" 
-                  className="w-12 h-12 object-cover rounded border" 
-                />
-                <button 
-                  onClick={() => setForm(prev => ({ ...prev, gambarUrl: "" }))}
-                  className="text-xs text-red-500 hover:text-red-700"
-                >
-                  Hapus
-                </button>
+              <div className="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+                <p className="text-xs text-gray-600 mb-2 font-medium">Preview:</p>
+                <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                  <div className="relative w-24 h-24 border rounded-lg overflow-hidden flex-shrink-0">
+                    {form.gambarUrl.startsWith('data:image/') || form.gambarUrl.startsWith('http') || form.gambarUrl.startsWith('/') ? (
+                      <img 
+                        src={form.gambarUrl} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                        <span className="text-gray-500">📷</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => {
+                          if (form.gambarUrl.startsWith('http') || form.gambarUrl.startsWith('/') || form.gambarUrl.startsWith('data:image/')) {
+                            window.open(form.gambarUrl, '_blank');
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors flex items-center gap-1 w-fit"
+                        disabled={!form.gambarUrl.startsWith('http') && !form.gambarUrl.startsWith('/') && !form.gambarUrl.startsWith('data:image/')}
+                      >
+                        <span>👁</span> Lihat Full
+                      </button>
+                      <button 
+                        onClick={() => setForm(prev => ({ ...prev, gambarUrl: "" }))}
+                        className="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors flex items-center gap-1 w-fit"
+                      >
+                        <span>🗑</span> Hapus Gambar
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {form.gambarUrl.length > 100 ? 
+                        "Gambar tersimpan (Base64)" : 
+                        form.gambarUrl.startsWith('/uploads/') ? 
+                        "Gambar tersimpan di server" : 
+                        "Gambar URL"}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Action Buttons - Lebih kecil */}
+          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
             {isEditing && (
               <button
@@ -681,13 +923,14 @@ export default function PettyCashPage() {
                   switchInputMode("dropdown");
                 }}
                 className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors border border-gray-300"
+                disabled={loading}
               >
                 Batal
               </button>
             )}
             <button 
               onClick={handleSubmit} 
-              className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1"
+              className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
             >
               {loading ? (
@@ -696,15 +939,19 @@ export default function PettyCashPage() {
                   Menyimpan...
                 </>
               ) : isEditing ? (
-                "💾 Simpan"
+                <>
+                  <span>💾</span> Simpan Perubahan
+                </>
               ) : (
-                "➕ Tambah"
+                <>
+                  <span>➕</span> Tambah Transaksi
+                </>
               )}
             </button>
           </div>
         </motion.div>
 
-        {/* Data Table Section - Lebih kompak */}
+        {/* Data Table Section */}
         <motion.div 
           className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
           initial={{ y: 10, opacity: 0 }} 
@@ -762,10 +1009,15 @@ export default function PettyCashPage() {
                       currentData.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-3 py-2 whitespace-nowrap font-mono text-gray-500 text-xs">
-                            {item.id.substring(0, 8)}...
+                            {item.id.length > 8 ? `${item.id.substring(0, 8)}...` : item.id}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap font-medium text-gray-900 text-xs">
-                            {item.nama}
+                            <div className="flex items-center gap-2">
+                              {item.nama}
+                              {item.gambarUrl && (
+                                <span className="text-blue-500" title="Ada gambar">📷</span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -799,18 +1051,21 @@ export default function PettyCashPage() {
                               <button
                                 onClick={() => handleDetail(item)}
                                 className="px-2 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-xs"
+                                title="Detail"
                               >
                                 👁
                               </button>
                               <button
                                 onClick={() => handleEdit(item)}
                                 className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors text-xs"
+                                title="Edit"
                               >
                                 ✏️
                               </button>
                               <button
                                 onClick={() => handleDelete(item.id)}
                                 className="px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors text-xs"
+                                title="Hapus"
                               >
                                 🗑
                               </button>
@@ -835,7 +1090,7 @@ export default function PettyCashPage() {
                 </table>
               </div>
 
-              {/* Pagination - Lebih kecil */}
+              {/* Pagination */}
               {filteredData.length > itemsPerPage && (
                 <div className="px-4 py-3 border-t border-gray-200">
                   <div className="flex items-center justify-between">
@@ -867,6 +1122,12 @@ export default function PettyCashPage() {
             </>
           )}
         </motion.div>
+
+        {/* Footer Info */}
+        <div className="mt-4 text-center text-xs text-gray-500">
+          <p>Total {filteredData.length} transaksi • Total pengeluaran: Rp {totalKeseluruhan.toLocaleString("id-ID")}</p>
+          <p className="mt-1">Gambar disimpan sebagai Base64 di database • Maksimal 2MB per gambar</p>
+        </div>
       </main>
     </div>
   );

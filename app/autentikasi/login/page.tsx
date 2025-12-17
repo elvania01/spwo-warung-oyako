@@ -12,13 +12,12 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // ✅ Pastikan hanya render di client (hindari SSR hydration mismatch)
   useEffect(() => {
     setMounted(true);
   }, []);
 
   if (!mounted) {
-    return null; // Jangan render sebelum client mount
+    return null;
   }
 
   const handleLogin = (e: React.FormEvent) => {
@@ -45,61 +44,87 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-container flex h-screen">
-      {/* Kiri */}
-        <div className="login-left flex-1 flex flex-col justify-center items-center bg-white p-8">
-      <h1 className="text-4xl font-bold text-amber-900 mb-4">Warung Oyako</h1>
-      <Image
-        src={oyakoCat}
-        alt="Warung Oyako"
-        width={400}
-        height={400}
-        priority
-        className="rounded-xl"
-      />
-    </div>
+    <div className="min-h-screen flex items-center justify-center">
+      {/* Background */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/warung oyako.jpg')" }}
+      >
+        <div className="absolute inset-0 bg-white/50"></div>
+      </div>
 
-      {/* Kanan */}
-      <div className="login-box flex-1 flex flex-col justify-center items-center bg-white shadow-lg p-10">
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">SPWO</h2>
-        <p className="text-gray-500 mb-6">Masuk ke Dashboard</p>
+      {/* Kotak putih besar */}
+      <div className="relative z-10 bg-white rounded-2xl shadow-xl flex w-[900px] overflow-hidden">
+        
+        {/* Kiri */}
+        <div className="w-1/2 flex flex-col justify-center items-center p-8">
+          <h1 className="text-4xl font-bold text-emerald-900 mb-4 text-center">
+            Warung Oyako
+          </h1>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4 w-72">
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="border rounded-md px-4 py-2"
+          <Image
+            src={oyakoCat}
+            alt="Warung Oyako"
+            width={350}
+            height={350}
+            priority
+            className="rounded-xl"
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border rounded-md px-4 py-2"
-          />
-          <button
-            type="submit"
-            className="bg-amber-600 text-white font-semibold py-2 rounded-md hover:bg-amber-700"
-          >
-            Log In
-          </button>
-        </form>
-
-        {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-
-        <div className="login-links mt-4">
-          <a href="/autentikasi/forgot" className="text-amber-700 hover:underline">
-            Lupa kata sandi?
-          </a>
         </div>
 
-        <div className="signup mt-3">
-          <span className="text-gray-600 mr-2">Pengguna baru?</span>
-          <a href="/autentikasi/regis" className="text-amber-700 font-semibold hover:underline">
-            Sign Up
-          </a>
+        {/* Kanan */}
+        <div className="w-1/2 flex flex-col justify-center items-center p-10">
+          <h2 className="text-3xl font-bold text-emerald-800 mb-2 text-center">
+            SPWO
+          </h2>
+          <p className="text-gray-500 mb-6 text-center">
+            Masuk ke Dashboard
+          </p>
+
+          <form
+            onSubmit={handleLogin}
+            className="flex flex-col gap-4 w-full max-w-xs"
+          >
+            <input
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="border rounded-md px-4 py-2"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="border rounded-md px-4 py-2"
+            />
+            <button
+              type="submit"
+              className="bg-emerald-600 text-white font-semibold py-2 rounded-md hover:bg-emerald-700"
+            >
+              Log In
+            </button>
+          </form>
+
+          {error && (
+            <p className="text-red-600 text-sm mt-2 text-center">
+              {error}
+            </p>
+          )}
+
+
+          <div className="mt-3 text-center">
+            <span className="text-gray-600 text-sm mr-2">
+              Pengguna baru?
+            </span>
+            <a
+              href="/autentikasi/regis"
+              className="font-semibold hover:underline text-sm"
+            >
+              Sign Up
+            </a>
+          </div>
         </div>
       </div>
     </div>

@@ -1,134 +1,250 @@
-import { NextRequest, NextResponse } from 'next/server';
+// app/api/dashboard/route.ts
+import { NextRequest } from "next/server";
+import { sql } from "@/app/lib/pettycash-db";
 
-// Tipe data untuk response
-interface GrafikDataItem {
-  name: string;
-  pengeluaran: number;
-  persentase: number;
-}
-
-interface RingkasanResponse {
-  totalPengeluaran: number;
-  sisaSaldo: number;
-  transaksiBulan: number;
-  pending: number;
-}
-
-interface GrafikResponse {
-  harian: GrafikDataItem[];
-  mingguan: GrafikDataItem[];
-  bulanan: GrafikDataItem[];
-}
-
-interface ApiResponse {
-  ringkasan: RingkasanResponse;
-  grafik: GrafikResponse;
-}
-
-// Mock data untuk development
-const generateMockData = (periode: string, dari: string, sampai: string) => {
-  const startDate = new Date(dari);
-  const endDate = new Date(sampai);
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  // Data harian
-  const harian: GrafikDataItem[] = [];
-  for (let i = 0; i < Math.min(diffDays, 30); i++) {
-    const date = new Date(startDate);
-    date.setDate(startDate.getDate() + i);
-    
-    harian.push({
-      name: date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
-      pengeluaran: Math.floor(Math.random() * 5000000) + 1000000,
-      persentase: Math.floor(Math.random() * 30) + 10,
-    });
-  }
-  
-  // Data mingguan (group by week)
-  const mingguan: GrafikDataItem[] = [];
-  const weeks = Math.ceil(diffDays / 7);
-  for (let i = 0; i < Math.min(weeks, 12); i++) {
-    mingguan.push({
-      name: `Minggu ${i + 1}`,
-      pengeluaran: Math.floor(Math.random() * 15000000) + 5000000,
-      persentase: Math.floor(Math.random() * 40) + 20,
-    });
-  }
-  
-  // Data bulanan
-  const bulanan: GrafikDataItem[] = [];
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  const currentMonth = new Date().getMonth();
-  const monthsToShow = 6;
-  
-  for (let i = 0; i < monthsToShow; i++) {
-    const monthIndex = (currentMonth - monthsToShow + 1 + i + 12) % 12;
-    bulanan.push({
-      name: months[monthIndex],
-      pengeluaran: Math.floor(Math.random() * 20000000) + 10000000,
-      persentase: Math.floor(Math.random() * 50) + 30,
-    });
-  }
-  
-  return { harian, mingguan, bulanan };
-};
-
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const dari = searchParams.get('dari') || new Date().toISOString().split('T')[0];
-    const sampai = searchParams.get('sampai') || new Date().toISOString().split('T')[0];
+    console.log("📊 Fetching dashboard data for PostgreSQL...");
     
-    console.log('Fetching dashboard data:', { dari, sampai });
+    // 1. Cek dulu apakah tabel pettycash ada dan strukturnya
+    console.log("🔍 Checking table structure...");
+    const tableCheck = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'pettycash'
+      ) as table_exists
+    `;
     
-    // TODO: Ganti dengan koneksi database sebenarnya
-    // Contoh dengan Prisma:
-    // const transactions = await prisma.transaction.findMany({
-    //   where: {
-    //     tanggal: {
-    //       gte: new Date(dari),
-    //       lte: new Date(sampai),
-    //     },
-    //   },
-    //   include: {
-    //     kategori: true,
-    //   },
-    // });
+    if (!tableCheck[0]?.table_exists) {
+      console.error("❌ Table 'pettycash' does not exist");
+      return Response.json({
+        success: false,
+        error: "Table 'pettycash' not found",
+        data: getFallbackData()
+      });
+    }
     
-    // Generate mock data berdasarkan filter
-    const grafik = generateMockData('bulanan', dari, sampai);
+    // 2. Cek kolom yang ada di tabel
+    const columns = await sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'pettycash'
+      ORDER BY ordinal_position
+    `;
+    console.log("📋 Columns in pettycash table:", columns.map(c => c.column_name));
     
-    // Hitung ringkasan dari data
-    const totalPengeluaran = grafik.bulanan.reduce((sum, item) => sum + item.pengeluaran, 0);
-    const totalTransaksi = grafik.bulanan.reduce((sum, item) => sum + Math.floor(item.pengeluaran / 1000000), 0);
+    // 3. Ambil semua data dari pettycash (batasi untuk testing)
+    const sampleData = await sql`
+      SELECT * FROM pettycash ORDER BY tanggal DESC LIMIT 5
+    `;
+    console.log("🎯 Sample data from pettycash:", sampleData);
     
-    const ringkasan: RingkasanResponse = {
-      totalPengeluaran,
-      sisaSaldo: 50000000 - totalPengeluaran, // Saldo awal 50 juta
-      transaksiBulan: totalTransaksi,
-      pending: Math.floor(Math.random() * 10) + 1,
+    // 4. Query utama dengan penyesuaian kolom
+    const [totalData, transactionData, categoryData, dateRange] = await Promise.all([
+      // Total transaksi dan pengeluaran
+      sql`
+        SELECT 
+          COUNT(*) as total_transaksi,
+          COALESCE(SUM(total), 0) as total_pengeluaran,
+          COALESCE(AVG(total), 0) as rata_rata_transaksi
+        FROM pettycash
+      `,
+      
+      // Data transaksi untuk grafik (gunakan tanggal yang ada)
+      sql`
+        SELECT 
+          DATE(tanggal) as tanggal,
+          SUM(total) as total_harian,
+          COUNT(*) as jumlah_transaksi
+        FROM pettycash
+        WHERE tanggal IS NOT NULL
+        GROUP BY DATE(tanggal)
+        ORDER BY tanggal DESC
+        LIMIT 30
+      `,
+      
+      // Data per kategori
+      sql`
+        SELECT 
+          kategori,
+          COUNT(*) as jumlah_transaksi,
+          SUM(total) as total_pengeluaran
+        FROM pettycash
+        WHERE kategori IS NOT NULL
+        GROUP BY kategori
+        ORDER BY total_pengeluaran DESC
+      `,
+      
+      // Rentang tanggal
+      sql`
+        SELECT 
+          MIN(tanggal) as tanggal_pertama,
+          MAX(tanggal) as tanggal_terakhir
+        FROM pettycash
+        WHERE tanggal IS NOT NULL
+      `
+    ]);
+    
+    console.log("📊 Query results:", {
+      total: totalData[0],
+      transactions: transactionData.length,
+      categories: categoryData.length,
+      dateRange: dateRange[0]
+    });
+    
+    const stats = totalData[0] || {};
+    const dateStats = dateRange[0] || {};
+    const totalPengeluaran = parseFloat(stats.total_pengeluaran) || 0;
+    
+    // 5. Format data untuk response
+    // Grafik harian
+    const grafikHarian = transactionData.map((item: any) => {
+      const date = new Date(item.tanggal);
+      return {
+        name: `${date.getDate()} ${date.toLocaleDateString('id-ID', { month: 'short' })}`,
+        pengeluaran: parseFloat(item.total_harian) || 0,
+        persentase: totalPengeluaran > 0 ? (parseFloat(item.total_harian) / totalPengeluaran) * 100 : 0,
+        tanggal: item.tanggal,
+        jumlah_transaksi: parseInt(item.jumlah_transaksi) || 0
+      };
+    }).reverse(); // Urutkan dari terlama ke terbaru
+    
+    // Grafik bulanan
+    const monthlyData = await sql`
+      SELECT 
+        EXTRACT(MONTH FROM tanggal) as bulan,
+        EXTRACT(YEAR FROM tanggal) as tahun,
+        SUM(total) as total_bulanan,
+        COUNT(*) as jumlah_transaksi
+      FROM pettycash
+      WHERE tanggal IS NOT NULL
+      GROUP BY EXTRACT(YEAR FROM tanggal), EXTRACT(MONTH FROM tanggal)
+      ORDER BY tahun, bulan
+    `;
+    
+    const bulanNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const grafikBulanan = monthlyData.map((item: any) => ({
+      name: `${bulanNames[parseInt(item.bulan) - 1]} ${item.tahun}`,
+      pengeluaran: parseFloat(item.total_bulanan) || 0,
+      persentase: totalPengeluaran > 0 ? (parseFloat(item.total_bulanan) / totalPengeluaran) * 100 : 0,
+      bulan: parseInt(item.bulan) || 0,
+      tahun: parseInt(item.tahun) || 0,
+      jumlah_transaksi: parseInt(item.jumlah_transaksi) || 0
+    }));
+    
+    // Kategori
+    const pengeluaranKategori: { [key: string]: number } = {};
+    categoryData.forEach((item: any) => {
+      pengeluaranKategori[item.kategori] = parseFloat(item.total_pengeluaran) || 0;
+    });
+    
+    // 6. Format response - DIUBAH: HAPUS SISA SALDO
+    const resultData = {
+      totalTransaksi: parseInt(stats.total_transaksi) || 0,
+      totalPengeluaran: totalPengeluaran,
+      rataRataTransaksi: parseFloat(stats.rata_rata_transaksi) || 0,
+      totalHariTransaksi: transactionData.length,
+      
+      grafikHarian,
+      grafikMingguan: generateWeeklyData(transactionData, totalPengeluaran),
+      grafikBulanan,
+      pengeluaranKategori,
+      
+      // DIHAPUS: sisaSaldo dan anggaranAwal
+      // sisaSaldo: Math.max(0, 50000000 - totalPengeluaran),
+      // anggaranAwal: 50000000,
+      
+      tanggalPertama: dateStats.tanggal_pertama,
+      tanggalTerakhir: dateStats.tanggal_terakhir,
+      
+      rentangData: dateStats.tanggal_pertama && dateStats.tanggal_terakhir
+        ? `${new Date(dateStats.tanggal_pertama).toLocaleDateString('id-ID')} - ${new Date(dateStats.tanggal_terakhir).toLocaleDateString('id-ID')}`
+        : 'Tidak ada data',
+      
+      jumlahKategori: Object.keys(pengeluaranKategori).length,
+      dataPoints: {
+        harian: grafikHarian.length,
+        mingguan: Math.ceil(grafikHarian.length / 7),
+        bulanan: grafikBulanan.length
+      }
     };
     
-    const response: ApiResponse = {
-      ringkasan,
-      grafik,
-    };
+    console.log("✅ Dashboard data ready:", {
+      totalTransaksi: resultData.totalTransaksi,
+      totalPengeluaran: resultData.totalPengeluaran,
+      hasData: resultData.totalTransaksi > 0
+    });
     
-    // Simulasi delay network
-    await new Promise(resolve => setTimeout(resolve, 300));
+    return Response.json({
+      success: true,
+      data: resultData,
+      timestamp: new Date().toISOString(),
+      debug: {
+        tableExists: tableCheck[0]?.table_exists,
+        columns: columns.map(c => c.column_name),
+        sampleCount: sampleData.length
+      }
+    });
     
-    return NextResponse.json(response);
+  } catch (err: any) {
+    console.error("❌ Error in dashboard API:", {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+      stack: err.stack
+    });
     
-  } catch (error) {
-    console.error('Error in dashboard API:', error);
-    
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch dashboard data',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    // Return fallback data
+    return Response.json({
+      success: false,
+      error: err.message,
+      data: getFallbackData(),
+      timestamp: new Date().toISOString()
+    });
   }
+}
+
+// Helper functions
+function generateWeeklyData(dailyData: any[], totalPengeluaran: number) {
+  if (dailyData.length === 0) return [];
+  
+  const weeks = [];
+  for (let i = 0; i < dailyData.length; i += 7) {
+    const weekData = dailyData.slice(i, i + 7);
+    const weekTotal = weekData.reduce((sum, day) => sum + parseFloat(day.total_harian || 0), 0);
+    const weekTransactions = weekData.reduce((sum, day) => sum + parseInt(day.jumlah_transaksi || 0), 0);
+    
+    weeks.push({
+      name: `Minggu ${weeks.length + 1}`,
+      pengeluaran: weekTotal,
+      persentase: totalPengeluaran > 0 ? (weekTotal / totalPengeluaran) * 100 : 0,
+      jumlah_transaksi: weekTransactions,
+      periode: weekData.length > 0 
+        ? `${new Date(weekData[0].tanggal).getDate()} ${new Date(weekData[0].tanggal).toLocaleDateString('id-ID', { month: 'short' })} - ${new Date(weekData[weekData.length - 1].tanggal).getDate()} ${new Date(weekData[weekData.length - 1].tanggal).toLocaleDateString('id-ID', { month: 'short' })}`
+        : ''
+    });
+  }
+  
+  return weeks;
+}
+
+function getFallbackData() {
+  return {
+    totalTransaksi: 0,
+    totalPengeluaran: 0,
+    rataRataTransaksi: 0,
+    totalHariTransaksi: 0,
+    grafikHarian: [],
+    grafikMingguan: [],
+    grafikBulanan: [],
+    pengeluaranKategori: {},
+    // DIHAPUS: sisaSaldo dan anggaranAwal
+    // sisaSaldo: 50000000,
+    // anggaranAwal: 50000000,
+    tanggalPertama: null,
+    tanggalTerakhir: null,
+    rentangData: 'Tidak ada data transaksi',
+    jumlahKategori: 0,
+    dataPoints: { harian: 0, mingguan: 0, bulanan: 0 }
+  };
 }

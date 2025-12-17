@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import oyakoCat from "../../../public/oyako-cat.png";
 
 export default function RegisterPage() {
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const [formData, setFormData] = useState({
     namaLengkap: "",
@@ -12,6 +14,14 @@ export default function RegisterPage() {
     noTelp: "",
     alamat: "",
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -22,97 +32,114 @@ export default function RegisterPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simpan data ke localStorage sebagai simulasi
     localStorage.setItem("userSPWO", JSON.stringify(formData));
     alert("Akun berhasil dibuat!");
     router.push("/autentikasi/login");
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row items-center justify-center bg-white font-poppins">
-      {/* BAGIAN KIRI */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-[#5DA46D] mb-4">
-          Warung Oyako
-        </h1>
-        <Image
-          src="/oyako-cat.png"
-          alt="Warung Oyako"
-          width={300}
-          height={300}
-          className="object-contain"
-        />
+    <div className="min-h-screen flex items-center justify-center">
+      {/* Background */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/warung oyako.jpg')" }}
+      >
+        <div className="absolute inset-0 bg-white/50"></div>
       </div>
 
-      {/* BAGIAN KANAN (FORM) */}
-      <div className="flex-1 flex flex-col justify-center items-center bg-[#6FC693] p-8 md:p-10 rounded-3xl md:rounded-none md:rounded-l-3xl shadow-lg w-full max-w-md">
-        <h2 className="text-3xl font-bold text-[#1B1B1B] mb-2">SPWO</h2>
-        <p className="text-md text-[#1B1B1B] font-medium mb-6">
-          Masuk ke Dashboard
-        </p>
+      {/* Kotak putih besar */}
+      <div className="relative z-10 bg-white rounded-2xl shadow-xl flex w-[900px] overflow-hidden">
+        
+        {/* Kiri */}
+        <div className="w-1/2 flex flex-col justify-center items-center p-8">
+          <h1 className="text-4xl font-bold text-emerald-900 mb-4 text-center">
+            Warung Oyako
+          </h1>
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col space-y-4 w-full"
-        >
-          <input
-            type="text"
-            name="namaLengkap"
-            placeholder="Nama Lengkap"
-            value={formData.namaLengkap}
-            onChange={handleChange}
-            className="w-full p-3 border border-black rounded-full focus:outline-none focus:ring-2 focus:ring-green-400"
-            required
+          <Image
+            src={oyakoCat}
+            alt="Warung Oyako"
+            width={350}
+            height={350}
+            priority
+            className="rounded-xl"
           />
+        </div>
 
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            className="w-full p-3 border border-black rounded-full focus:outline-none focus:ring-2 focus:ring-green-400"
-            required
-          />
+        {/* Kanan */}
+        <div className="w-1/2 flex flex-col justify-center items-center p-10">
+          <h2 className="text-3xl font-bold text-emerald-800 mb-2 text-center">
+            SPWO
+          </h2>
+          <p className="text-gray-500 mb-6 text-center">
+            Buat Akun Baru
+          </p>
 
-          <input
-            type="text"
-            name="noTelp"
-            placeholder="No. Telp"
-            value={formData.noTelp}
-            onChange={handleChange}
-            className="w-full p-3 border border-black rounded-full focus:outline-none focus:ring-2 focus:ring-green-400"
-            required
-          />
-
-          <input
-            type="text"
-            name="alamat"
-            placeholder="Alamat"
-            value={formData.alamat}
-            onChange={handleChange}
-            className="w-full p-3 border border-black rounded-full focus:outline-none focus:ring-2 focus:ring-green-400"
-            required
-          />
-
-          <button
-            type="submit"
-            className="w-full bg-[#2563EB] text-white font-semibold py-3 rounded-full hover:bg-[#1E4ED8] transition-all duration-200"
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-4 w-full max-w-xs"
           >
-            Buat Akun
-          </button>
-        </form>
+            <input
+              type="text"
+              name="namaLengkap"
+              placeholder="Nama Lengkap"
+              value={formData.namaLengkap}
+              onChange={handleChange}
+              className="border rounded-md px-4 py-2"
+              required
+            />
 
-        <p className="mt-4 text-sm text-black">
-          Sudah punya akun?{" "}
-          <button
-            type="button"
-            onClick={() => router.push("/autentikasi/login")}
-            className="text-red-600 hover:underline font-semibold"
-          >
-            Log In
-          </button>
-        </p>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleChange}
+              className="border rounded-md px-4 py-2"
+              required
+            />
+
+            <input
+              type="text"
+              name="noTelp"
+              placeholder="No. Telp"
+              value={formData.noTelp}
+              onChange={handleChange}
+              className="border rounded-md px-4 py-2"
+              required
+            />
+
+            <input
+              type="text"
+              name="alamat"
+              placeholder="Alamat"
+              value={formData.alamat}
+              onChange={handleChange}
+              className="border rounded-md px-4 py-2"
+              required
+            />
+
+            <button
+              type="submit"
+              className="bg-emerald-600 text-white font-semibold py-2 rounded-md hover:bg-emerald-700"
+            >
+              Buat Akun
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <span className="text-gray-600 text-sm mr-2">
+              Sudah punya akun?
+            </span>
+            <button
+              type="button"
+              onClick={() => router.push("/autentikasi/login")}
+              className="font-semibold hover:underline text-sm"
+            >
+              Log In
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -3,6 +3,18 @@
 import { useState, useEffect } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { Line, Bar, Pie } from 'react-chartjs-2';
+import { useRouter } from "next/navigation";
+import {
+  BarChart,
+  Bar as RechartsBar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Line as RechartsLine,
+  Legend,
+} from "recharts";
 
 Chart.register(...registerables);
 
@@ -44,12 +56,47 @@ interface SummaryData {
   tanggal_akhir?: string;
 }
 
-export default function DashboardCharts() {
+interface DashboardData {
+  totalTransaksi: number;
+  totalPengeluaran: number;
+  rataRataTransaksi: number;
+  totalHariTransaksi: number;
+  grafikHarian: Array<{
+    name: string;
+    pengeluaran: number;
+    persentase: number;
+    tanggal: string;
+  }>;
+  grafikMingguan: Array<{
+    name: string;
+    pengeluaran: number;
+    persentase: number;
+    periode: string;
+  }>;
+  grafikBulanan: Array<{
+    name: string;
+    pengeluaran: number;
+    persentase: number;
+    bulan: number;
+    tahun: number;
+  }>;
+  pengeluaranKategori: { [key: string]: number };
+  tanggalPertama: string;
+  tanggalTerakhir: string;
+  rentangData: string;
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [pettyCashData, setPettyCashData] = useState<PettyCashItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics'>('overview');
+  const [periode, setPeriode] = useState<"Harian" | "Mingguan" | "Bulanan">("Harian");
 
   // Helper function to safely convert date to ISO string
   const safeToISOString = (date: Date | null): string | undefined => {
@@ -73,10 +120,40 @@ export default function DashboardCharts() {
     }
   };
 
-  // Fetch data pettycash langsung dari API utama
-  const fetchPettyCashData = async () => {
+  // Check authentication
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const user = localStorage.getItem("user");
+    if (!user) {
+      router.replace("/autentikasi/login");
+    } else {
+      setIsChecking(false);
+    }
+  }, [router]);
+
+  // Fetch data from both APIs
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      const response = await fetch('/api/dashboard');
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setDashboardData(result.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch pettycash data directly from main API
+  const fetchPettyCashData = async () => {
+    try {
       setError(null);
       
       const response = await fetch('/api/pettycash');
@@ -88,7 +165,7 @@ export default function DashboardCharts() {
       const result = await response.json();
       
       if (result.success) {
-        // Transform data ke format yang konsisten
+        // Transform data to consistent format
         const transformedData: PettyCashItem[] = result.data
           .filter((item: any) => item)
           .map((item: any) => ({
@@ -109,12 +186,10 @@ export default function DashboardCharts() {
     } catch (err: any) {
       console.error('Error loading petty cash data:', err);
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Proses data untuk chart
+  // Process data for charts
   const processChartData = () => {
     if (pettyCashData.length === 0) {
       return {
@@ -243,7 +318,7 @@ export default function DashboardCharts() {
     });
     produk.sort((a, b) => b.total_nilai - a.total_nilai);
 
-    // Format summary data menggunakan helper function
+    // Format summary data using helper function
     const summary: SummaryData = {
       total_transaksi: pettyCashData.length,
       total_nilai: totalNilai,
@@ -255,34 +330,42 @@ export default function DashboardCharts() {
     return { kategori, bulanan, produk, summary };
   };
 
+  // Fetch all data on component mount
   useEffect(() => {
-    fetchPettyCashData();
-    
-    // Setup auto-refresh jika diaktifkan
+    const fetchAllData = async () => {
+      await Promise.all([
+        fetchDashboardData(),
+        fetchPettyCashData()
+      ]);
+    };
+
+    if (!isChecking) {
+      fetchAllData();
+    }
+  }, [isChecking]);
+
+  // Setup auto-refresh
+  useEffect(() => {
     let intervalId: NodeJS.Timeout;
-    if (autoRefresh) {
+    if (autoRefresh && !isChecking) {
       intervalId = setInterval(() => {
         fetchPettyCashData();
-      }, 30000); // Refresh setiap 30 detik
+      }, 30000); // Refresh every 30 seconds
     }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [autoRefresh]);
+  }, [autoRefresh, isChecking]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    router.push("/autentikasi/login");
+  };
 
   const chartData = processChartData();
 
-  if (loading && pettyCashData.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-        <p className="text-gray-600">Memuat data chart...</p>
-      </div>
-    );
-  }
-
-  // Persiapkan data untuk charts
+  // Prepare data for charts
   const pieData = {
     labels: chartData.kategori.map(item => item.kategori || "Lainnya"),
     datasets: [{
@@ -351,263 +434,456 @@ export default function DashboardCharts() {
     },
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header dengan toggle auto-refresh */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Analisis Petty Cash</h2>
-          <p className="text-sm text-gray-600">
-            Data realtime dari transaksi petty cash
+  // Graph data
+  const grafikData = {
+    Harian: dashboardData?.grafikHarian || [],
+    Mingguan: dashboardData?.grafikMingguan || [],
+    Bulanan: dashboardData?.grafikBulanan || [],
+  };
+
+  const grafikPettyCash = grafikData[periode];
+
+  // Custom Tooltip for Recharts
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow">
+          <p className="font-semibold text-gray-800">{`Periode: ${label}`}</p>
+          <p className="text-emerald-600">
+            {`Pengeluaran: Rp ${payload[0].value.toLocaleString('id-ID')}`}
           </p>
+          {payload[1] && (
+            <p className="text-red-500">
+              {`Persentase: ${payload[1].value.toFixed(1)}%`}
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className={`relative inline-block w-12 h-6 rounded-full cursor-pointer ${autoRefresh ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                 onClick={() => setAutoRefresh(!autoRefresh)}>
-              <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${autoRefresh ? 'right-1' : 'left-1'}`}></div>
-            </div>
-            <span className="text-sm text-gray-700">Auto-refresh</span>
+      );
+    }
+    return null;
+  };
+
+  // Loading screen
+  if (isChecking || (loading && pettyCashData.length === 0 && !dashboardData)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        {/* Header skeleton */}
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
           </div>
-          <button
-            onClick={fetchPettyCashData}
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 transition-colors text-sm"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Memuat...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Refresh
-              </>
-            )}
-          </button>
+        </div>
+
+        {/* Content skeleton */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+          {/* Chart skeleton */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              <div>
+                <div className="h-6 bg-gray-200 rounded w-56 mb-1 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+              </div>
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="w-20 h-10 bg-gray-200 rounded-md mx-1 animate-pulse"></div>
+                ))}
+              </div>
+            </div>
+            <div className="h-80 bg-gray-100 rounded animate-pulse"></div>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="flex-1">
-              <p className="text-sm text-red-700">Error: {error}</p>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Dashboard Petty Cash</h1>
+              {dashboardData?.rentangData && (
+                <p className="text-sm text-gray-500 mt-1">{dashboardData.rentangData}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
               <button
-                onClick={fetchPettyCashData}
-                className="mt-2 text-sm text-red-700 hover:text-red-900 font-medium"
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
               >
-                Coba Lagi
+                <div className={`relative inline-block w-10 h-5 rounded-full ${autoRefresh ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${autoRefresh ? 'right-0.5' : 'left-0.5'}`}></div>
+                </div>
+                <span>Auto-refresh</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+              >
+                Logout
               </button>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Status Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-              <span className="text-sm text-blue-700">
-                {autoRefresh ? 'Auto-refresh aktif' : 'Auto-refresh nonaktif'}
+          {/* Tab Navigation */}
+          <div className="mt-4 flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'overview' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'analytics' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              Analytics
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-red-500 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-red-700">Error: {error}</p>
+                <button
+                  onClick={fetchPettyCashData}
+                  className="mt-2 text-sm text-red-700 hover:text-red-900 font-medium"
+                >
+                  Coba Lagi
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Status Info */}
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                <span className="text-sm text-blue-700">
+                  {autoRefresh ? 'Auto-refresh aktif' : 'Auto-refresh nonaktif'}
+                </span>
+              </div>
+              <span className="text-sm text-blue-600">•</span>
+              <span className="text-sm text-blue-600">
+                {pettyCashData.length} transaksi ditemukan
               </span>
             </div>
-            <span className="text-sm text-blue-600">•</span>
-            <span className="text-sm text-blue-600">
-              {pettyCashData.length} transaksi ditemukan
+            <span className="text-xs text-blue-500">
+              Terakhir diupdate: {lastUpdated.toLocaleTimeString('id-ID')}
             </span>
           </div>
-          <span className="text-xs text-blue-500">
-            Terakhir diupdate: {lastUpdated.toLocaleTimeString('id-ID')}
-          </span>
         </div>
-      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Total Transaksi</h3>
-          <p className="text-2xl font-bold text-blue-600 mt-2">
-            {chartData.summary.total_transaksi.toLocaleString('id-ID')}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {chartData.summary.tanggal_awal && chartData.summary.tanggal_akhir 
-              ? `Periode: ${chartData.summary.tanggal_awal} - ${chartData.summary.tanggal_akhir}`
-              : 'Belum ada data transaksi'}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Total Pengeluaran</h3>
-          <p className="text-2xl font-bold text-emerald-600 mt-2">
-            Rp {chartData.summary.total_nilai.toLocaleString('id-ID')}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {chartData.summary.total_transaksi > 0 
-              ? `Rata-rata: Rp ${Math.round(chartData.summary.rata_rata).toLocaleString('id-ID')}/transaksi`
-              : 'Belum ada transaksi'}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
-          <h3 className="text-sm font-medium text-gray-500">Kategori Teratas</h3>
-          <p className="text-2xl font-bold text-amber-600 mt-2">
-            {chartData.kategori.length > 0 ? chartData.kategori[0].kategori : '-'}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {chartData.kategori.length > 0 
-              ? `Rp ${chartData.kategori[0].total.toLocaleString('id-ID')} (${chartData.kategori[0].jumlah} transaksi)`
-              : 'Belum ada data kategori'}
-          </p>
-        </div>
-      </div>
+        {/* OVERVIEW TAB */}
+        {activeTab === 'overview' && (
+          <>
+            {/* Grafik Section */}
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Grafik Petty Cash - {periode}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {grafikPettyCash.length} data point
+                  </p>
+                </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Line Chart - Trend Bulanan */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Trend Bulanan
-            </h3>
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              {chartData.bulanan.length} bulan
-            </span>
-          </div>
-          <div className="h-64">
-            {chartData.bulanan.length > 0 ? (
-              <Line 
-                data={lineData} 
-                options={{
-                  ...chartOptions,
-                  plugins: {
-                    ...chartOptions.plugins,
-                    title: {
-                      display: false,
-                      text: 'Trend Bulanan'
-                    }
-                  }
-                }} 
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-gray-400">Tidak ada data untuk ditampilkan</p>
+                {/* Period Selector */}
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                  {["Harian", "Mingguan", "Bulanan"].map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setPeriode(item as any)}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        periode === item 
+                          ? 'bg-white text-emerald-700 shadow' 
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chart Container */}
+              <div className="h-80">
+                {grafikPettyCash.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={grafikPettyCash}
+                      margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fill: '#666', fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fill: '#666', fontSize: 12 }}
+                        tickFormatter={(value) => `Rp ${value.toLocaleString('id-ID')}`}
+                      />
+                      <RechartsTooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <RechartsBar
+                        dataKey="pengeluaran"
+                        fill="#10b981"
+                        barSize={30}
+                        radius={[4, 4, 0, 0]}
+                        name="Pengeluaran"
+                      />
+                      {periode !== "Bulanan" && (
+                        <RechartsLine
+                          type="monotone"
+                          dataKey="persentase"
+                          stroke="#ef4444"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          name="Persentase (%)"
+                        />
+                      )}
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                    <div className="text-4xl mb-4">📊</div>
+                    <p className="text-lg">Tidak ada data transaksi</p>
+                    <p className="text-sm mt-2">Data akan muncul setelah ada transaksi petty cash</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Chart Footer */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500 text-center">
+                  Data diambil dari semua transaksi pettycash • Terakhir diperbarui: {new Date().toLocaleString('id-ID')}
+                </p>
+              </div>
+            </div>
+
+            {/* Kategori Pengeluaran */}
+            {dashboardData?.pengeluaranKategori && Object.keys(dashboardData.pengeluaranKategori).length > 0 && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pengeluaran per Kategori</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(dashboardData.pengeluaranKategori).map(([kategori, jumlah], index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                      <span className="font-medium text-gray-700">{kategori}</span>
+                      <span className="font-bold text-emerald-700">
+                        Rp {jumlah.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
-        </div>
+          </>
+        )}
 
-        {/* Pie Chart - Distribusi Kategori */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Distribusi Kategori
-            </h3>
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              {chartData.kategori.length} kategori
-            </span>
-          </div>
-          <div className="h-64">
-            {chartData.kategori.length > 0 ? (
-              <Pie 
-                data={pieData} 
-                options={{
-                  ...chartOptions,
-                  plugins: {
-                    ...chartOptions.plugins,
-                    title: {
-                      display: false,
-                      text: 'Distribusi Kategori'
-                    }
-                  }
-                }} 
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-gray-400">Tidak ada data untuk ditampilkan</p>
+        {/* ANALYTICS TAB */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            {/* Summary Cards - DITAMBAHKAN RATA-RATA PENGELUARAN */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
+                <h3 className="text-sm font-medium text-gray-500">Total Transaksi</h3>
+                <p className="text-2xl font-bold text-blue-600 mt-2">
+                  {chartData.summary.total_transaksi.toLocaleString('id-ID')}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {chartData.summary.tanggal_awal && chartData.summary.tanggal_akhir 
+                    ? `Periode: ${chartData.summary.tanggal_awal} - ${chartData.summary.tanggal_akhir}`
+                    : 'Belum ada data transaksi'}
+                </p>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
+                <h3 className="text-sm font-medium text-gray-500">Total Pengeluaran</h3>
+                <p className="text-2xl font-bold text-emerald-600 mt-2">
+                  Rp {chartData.summary.total_nilai.toLocaleString('id-ID')}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Total pengeluaran semua transaksi
+                </p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
+                <h3 className="text-sm font-medium text-gray-500">Rata-rata Pengeluaran</h3>
+                <p className="text-2xl font-bold text-purple-600 mt-2">
+                  Rp {Math.round(chartData.summary.rata_rata).toLocaleString('id-ID')}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Rata-rata per transaksi
+                </p>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow">
+                <h3 className="text-sm font-medium text-gray-500">Kategori Teratas</h3>
+                <p className="text-2xl font-bold text-amber-600 mt-2">
+                  {chartData.kategori.length > 0 ? chartData.kategori[0].kategori : '-'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {chartData.kategori.length > 0 
+                    ? `Rp ${chartData.kategori[0].total.toLocaleString('id-ID')} (${chartData.kategori[0].jumlah} transaksi)`
+                    : 'Belum ada data kategori'}
+                </p>
+              </div>
+            </div>
 
-        {/* Bar Chart - Produk Terlaris */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Produk dengan Nilai Terbesar
-            </h3>
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              Top {Math.min(10, chartData.produk.length)} produk
-            </span>
-          </div>
-          <div className="h-72">
-            {chartData.produk.length > 0 ? (
-              <Bar 
-                data={barData} 
-                options={{
-                  ...chartOptions,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      ticks: {
-                        callback: function(value: any) {
-                          if (typeof value === 'number') {
-                            return 'Rp ' + value.toLocaleString('id-ID');
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Line Chart - Trend Bulanan */}
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Trend Bulanan
+                  </h3>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    {chartData.bulanan.length} bulan
+                  </span>
+                </div>
+                <div className="h-64">
+                  {chartData.bulanan.length > 0 ? (
+                    <Line 
+                      data={lineData} 
+                      options={{
+                        ...chartOptions,
+                        plugins: {
+                          ...chartOptions.plugins,
+                          title: {
+                            display: false,
+                            text: 'Trend Bulanan'
                           }
-                          return value;
                         }
-                      }
-                    }
-                  },
-                  plugins: {
-                    ...chartOptions.plugins,
-                    title: {
-                      display: false,
-                      text: 'Produk Terlaris'
-                    }
-                  }
-                }} 
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-gray-400">Tidak ada data untuk ditampilkan</p>
+                      }} 
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-gray-400">Tidak ada data untuk ditampilkan</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Data Details */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-700 mb-3">Detail Data</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="text-gray-600">Total Data: <span className="font-semibold">{pettyCashData.length} transaksi</span></p>
-            <p className="text-gray-600">Kategori: <span className="font-semibold">{chartData.kategori.length} jenis</span></p>
+              {/* Pie Chart - Distribusi Kategori */}
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Distribusi Kategori
+                  </h3>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    {chartData.kategori.length} kategori
+                  </span>
+                </div>
+                <div className="h-64">
+                  {chartData.kategori.length > 0 ? (
+                    <Pie 
+                      data={pieData} 
+                      options={{
+                        ...chartOptions,
+                        plugins: {
+                          ...chartOptions.plugins,
+                          title: {
+                            display: false,
+                            text: 'Distribusi Kategori'
+                          }
+                        }
+                      }} 
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-gray-400">Tidak ada data untuk ditampilkan</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bar Chart - Produk Terlaris */}
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200 lg:col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Produk dengan Nilai Terbesar
+                  </h3>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                    Top {Math.min(10, chartData.produk.length)} produk
+                  </span>
+                </div>
+                <div className="h-72">
+                  {chartData.produk.length > 0 ? (
+                    <Bar 
+                      data={barData} 
+                      options={{
+                        ...chartOptions,
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            ticks: {
+                              callback: function(value: any) {
+                                if (typeof value === 'number') {
+                                  return 'Rp ' + value.toLocaleString('id-ID');
+                                }
+                                return value;
+                              }
+                            }
+                          }
+                        },
+                        plugins: {
+                          ...chartOptions.plugins,
+                          title: {
+                            display: false,
+                            text: 'Produk Terlaris'
+                          }
+                        }
+                      }} 
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-gray-400">Tidak ada data untuk ditampilkan</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Data Details */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-medium text-gray-700 mb-3">Detail Data</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Total Data: <span className="font-semibold">{pettyCashData.length} transaksi</span></p>
+                  <p className="text-gray-600">Kategori: <span className="font-semibold">{chartData.kategori.length} jenis</span></p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Rentang Tanggal: <span className="font-semibold">
+                    {chartData.summary.tanggal_awal && chartData.summary.tanggal_akhir 
+                      ? `${chartData.summary.tanggal_awal} - ${chartData.summary.tanggal_akhir}`
+                      : 'Tidak tersedia'}
+                  </span></p>
+                  <p className="text-gray-600">Produk Unik: <span className="font-semibold">{chartData.produk.length} jenis</span></p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Status Auto-refresh: <span className={`font-semibold ${autoRefresh ? 'text-green-600' : 'text-gray-600'}`}>
+                    {autoRefresh ? 'Aktif (30 detik)' : 'Nonaktif'}
+                  </span></p>
+                  <p className="text-gray-600">Terakhir Diperbarui: <span className="font-semibold">{lastUpdated.toLocaleTimeString('id-ID')}</span></p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-gray-600">Rentang Tanggal: <span className="font-semibold">
-              {chartData.summary.tanggal_awal && chartData.summary.tanggal_akhir 
-                ? `${chartData.summary.tanggal_awal} - ${chartData.summary.tanggal_akhir}`
-                : 'Tidak tersedia'}
-            </span></p>
-            <p className="text-gray-600">Produk Unik: <span className="font-semibold">{chartData.produk.length} jenis</span></p>
-          </div>
-          <div>
-            <p className="text-gray-600">Status Auto-refresh: <span className={`font-semibold ${autoRefresh ? 'text-green-600' : 'text-gray-600'}`}>
-              {autoRefresh ? 'Aktif (30 detik)' : 'Nonaktif'}
-            </span></p>
-            <p className="text-gray-600">Terakhir Diperbarui: <span className="font-semibold">{lastUpdated.toLocaleTimeString('id-ID')}</span></p>
-          </div>
-        </div>
-      </div>
+        )}
+      </main>
     </div>
   );
 }
